@@ -1,0 +1,204 @@
+import os
+import numpy as np
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import VGG19, ResNet50, InceptionV3
+from tensorflow.keras.layers import Input, Flatten, Dense, Dropout, concatenate
+from tensorflow.keras.models import Model
+import warnings
+from PIL import Image
+warnings.filterwarnings('ignore')
+
+# Define data directories
+train_dir = 'output/train'
+val_dir = 'output/val'
+test_dir = 'output/test'
+
+# Define image data generator
+datagen = ImageDataGenerator(rescale=1./255)
+
+# Define batch size
+batch_size = 64  #Earlier it was 32
+
+# Create image generators
+train_gen = datagen.flow_from_directory(train_dir, target_size=(128, 128), batch_size=batch_size, class_mode='categorical')
+val_gen = datagen.flow_from_directory(val_dir, target_size=(128, 128), batch_size=batch_size, class_mode='categorical')
+test_gen = datagen.flow_from_directory(test_dir, target_size=(128, 128), batch_size=batch_size, class_mode='categorical')
+
+# Load pre-trained models
+vgg_model = VGG19(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
+resnet_model = ResNet50(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
+inception_model = InceptionV3(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
+
+# Freeze pre-trained models
+for layer in vgg_model.layers:
+    layer.trainable = False
+for layer in resnet_model.layers:
+    layer.trainable = False
+for layer in inception_model.layers:
+    layer.trainable = False
+
+# Create ensemble model
+inputs = Input(shape=(128, 128, 3))
+vgg = vgg_model(inputs)
+vgg = Flatten()(vgg)
+vgg = Dense(256, activation='relu')(vgg)
+vgg = Dropout(0.20)(vgg)   #Earlier it was 0.5  
+resnet = resnet_model(inputs)
+resnet = Flatten()(resnet)
+resnet = Dense(256, activation='relu')(resnet)
+resnet = Dropout(0.20)(resnet) #Earlier it was 0.5
+inception = inception_model(inputs)
+inception = Flatten()(inception)
+inception = Dense(256, activation='relu')(inception)
+inception = Dropout(0.20)(inception) #Earlier it was 0.5
+concat = concatenate([vgg, resnet, inception])
+outputs = Dense(4, activation='softmax')(concat)
+
+ensemble_model = Model(inputs=inputs, outputs=outputs)
+
+from keras.callbacks import EarlyStopping
+
+# Compile ensemble model
+
+early_stop=EarlyStopping(monitor='val_accuracy',patience=10,restore_best_weights=True)
+
+ensemble_model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+# For running next time change loss function and remove sparse ahead from this.
+
+ensemble_model.summary()
+
+# Train ensemble model
+hist = ensemble_model.fit(train_gen, epochs=10, validation_data=val_gen , callbacks=[early_stop])
+
+get_ac = hist.history['accuracy']
+get_los = hist.history['loss']
+val_acc = hist.history['val_accuracy']
+val_loss = hist.history['val_loss']
+
+import matplotlib.pyplot as plt
+
+epochs = range(len(get_ac))
+
+# Create a figure with 2 subplots in one row
+fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+# Plot the training accuracy and loss on the first subplot
+axs[0].plot(epochs, get_ac, 'r', label='Accuracy of Training data')
+axs[0].set_title('Training data accuracy')
+axs[0].legend(loc=0)
+axs[0].set_xlabel("Epochs")
+axs[0].set_ylabel("Accuracy")
+
+# Show the minor grid lines with very faint and almost transparent grey lines
+axs[0].grid(b=True, which='major', color='darkblue', linestyle='-')
+axs[0].minorticks_on()
+axs[0].grid(b=True, which='minor', color='black', linestyle='--', alpha=0.4)
+
+# Plot the training and validation accuracy on the second subplot
+axs[1].plot(epochs, get_los, 'g', label='Loss of Training Data')
+axs[1].set_title('Training Data Loss')
+axs[1].legend(loc=0)
+axs[1].set_xlabel("Epochs")
+axs[1].set_ylabel("Loss")
+
+# Show the minor grid lines with very faint and almost transparent grey lines
+axs[1].grid(b=True, which='major', color='darkblue', linestyle='-')
+axs[1].minorticks_on()
+axs[1].grid(b=True, which='minor', color='black', linestyle='--', alpha=0.4)
+
+# Adjust the spacing between the subplots
+plt.subplots_adjust(wspace=0.3)
+
+plt.show()
+
+
+# 2nd row
+
+fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+# Loss of training data
+axs[0].plot(epochs, val_acc, 'r', label='Accuracy of Validation Data')
+axs[0].set_title('Validation data Accuracy')
+axs[0].legend(loc=0)
+axs[0].set_xlabel("Epochs")
+axs[0].set_ylabel("Accuracy")
+# Show the minor grid lines with very faint and almost transparent grey lines
+axs[0].grid(b=True, which='major', color='darkblue', linestyle='-')
+axs[0].minorticks_on()
+axs[0].grid(b=True, which='minor', color='black', linestyle='--', alpha=0.4)
+
+# Loss of Validation Data
+axs[1].plot(epochs, val_loss, 'g', label='Loss of Validation Data')
+axs[1].set_title('Validation data loss')
+axs[1].legend(loc=0)
+axs[1].set_xlabel("Epochs")
+axs[1].set_ylabel("Loss")
+# Show the minor grid lines with very faint and almost transparent grey lines
+axs[1].grid(b=True, which='major', color='darkblue', linestyle='-')
+axs[1].minorticks_on()
+axs[1].grid(b=True, which='minor', color='black', linestyle='--', alpha=0.4)
+
+plt.subplots_adjust(wspace=0.3)
+
+# For Saving Figure in the path
+plt.savefig("Graphs.png")
+
+# Display the figure
+plt.show()
+
+scores = ensemble_model.evaluate(test_gen)
+print("Accuracy: %.2f%%" % (scores[1]*100))
+
+import tensorflow as tf
+import warnings
+class_names = ['Mild Demented', 'Moderate Demented', 'Non Demented', 'Very Mild Demented']
+
+# Define the test dataset.
+test_ds = tf.keras.preprocessing.image_dataset_from_directory(
+    'output/test',
+    image_size=(128, 128),
+    batch_size=16,
+    shuffle=True
+)
+
+plt.figure(figsize=(20, 20))  # Create a new figure with size 20 x 20.
+
+# Loop through the first batch of images and labels in the test dataset.
+for images, labels in test_ds.take(1):
+    
+    # Loop through each image in the batch.
+    for i in range(16):
+        # Create a subplot with 4 rows, 4 columns and the i+1-th position.
+        ax = plt.subplot(4, 4, i + 1)
+        
+        # Display the image as a uint8 numpy array.
+        plt.imshow(images[i].numpy().astype("uint8"))
+        
+        # Make predictions on the current image using the trained model.
+        predictions = ensemble_model.predict(tf.expand_dims(images[i], 0))
+        
+        # Compute the predicted label and the softmax score for the predictions.
+        predicted_label = np.argmax(predictions[0])
+        score = tf.nn.softmax(predictions[0])
+        
+        # Check if the predicted class matches the actual class label.
+        if class_names[labels[i]] == class_names[predicted_label]:
+#       if class_name[labels[i]] ==  class_name[np.argmax(score)] :   
+            # If the prediction is correct, set the title to "Actual" and the label text color to green.
+            plt.title("Actual: " + class_names[labels[i]])
+            plt.ylabel("Predicted: " + class_names[predicted_label], fontdict={'color': 'green'})
+#           plt.ylabel("Predicted: " + class_name[np.argmax(score)], fontdict={'color': 'green'})
+        else:
+            # If the prediction is incorrect, set the title to "Actual" and the label text color to red.
+            plt.title("Actual: " + class_names[labels[i]])
+            plt.ylabel("Predicted: " + class_names[predicted_label], fontdict={'color': 'red'})
+#           plt.ylabel("Predicted: " + class_name[np.argmax(score)], fontdict={'color': 'red'})
+        
+        # Remove y-axis tick labels.
+        plt.gca().axes.yaxis.set_ticklabels([])
+        
+        # Remove x-axis tick labels.
+        plt.gca().axes.xaxis.set_ticklabels([])
+
+# Show the figure.
+plt.show()

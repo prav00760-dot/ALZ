@@ -1,0 +1,271 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.image as img
+
+
+import warnings
+from PIL import Image
+warnings.filterwarnings('ignore')
+
+
+from sklearn.model_selection import train_test_split
+from tensorflow import keras
+from keras import layers
+import tensorflow as tf
+from tensorflow.keras.preprocessing import image_dataset_from_directory
+from tensorflow.keras import Sequential, Input
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.layers import Conv2D, Flatten
+
+import os
+print(os.listdir("Dataset"))
+
+model.compile(loss="sparse_categorical_crossentropy", optimizer = "Adam",metrics=["accuracy"])
+
+import splitfolders
+splitfolders.ratio('Dataset', output="output", seed=1345, ratio=(.8, 0.1,0.1))
+
+# Set the image height and width to 128
+IMG_HEIGHT = 128
+IMG_WIDTH = 128
+
+# Load the training dataset from the "./output/train" directory with a random seed of 123,
+# set the image size to (IMG_HEIGHT, IMG_WIDTH), and set the batch size to 64.
+train_ds = tf.keras.preprocessing.image_dataset_from_directory(
+"./output/train",
+seed=123,
+image_size=(IMG_HEIGHT, IMG_WIDTH),
+batch_size=64
+)
+
+# Load the testing dataset from the "./output/test" directory with a random seed of 123,
+# set the image size to (IMG_HEIGHT, IMG_WIDTH), and set the batch size to 64.
+test_ds = tf.keras.preprocessing.image_dataset_from_directory(
+"./output/test",
+seed=123,
+image_size=(IMG_HEIGHT, IMG_WIDTH),
+batch_size=64
+)
+
+# Load the validation dataset from the "./output/val" directory with a random seed of 123,
+# set the image size to (IMG_HEIGHT, IMG_WIDTH), and set the batch size to 64
+val_ds = tf.keras.preprocessing.image_dataset_from_directory(
+"./output/val",
+seed=123,
+image_size=(IMG_HEIGHT, IMG_WIDTH),
+batch_size=64
+)
+
+# Retrieve the class names from the training dataset.
+class_names = train_ds.class_names
+
+# Print the class names.
+print(class_names)
+
+# Use the training dataset.
+train_ds
+
+# Set the size of the figure to 10 x 10 inches.
+plt.figure(figsize=(10, 10))
+
+# Loop through the first batch of images and labels from the training dataset.
+for images, labels in train_ds.take(1):
+
+    # Loop through the first 9 images in the batch.
+    for i in range(9):
+
+        # Create a subplot for each image in a 3 x 3 grid.
+        ax = plt.subplot(3, 3, i + 1)
+
+        # Display the image as a numpy array with an unsigned integer datatype.
+        plt.imshow(images[i].numpy().astype("uint8"))
+
+        # Set the title of the subplot to the corresponding class name of the image.
+        plt.title(class_names[labels[i]])
+        plt.axis("off")
+# Create a new figure.
+fig = plt.figure()
+
+# Add an axes to the figure with a size of [0, 0, 1, 1].
+ax = fig.add_axes([0, 0, 1, 1])
+
+# Create a list of sizes.
+size = [896, 64, 3200, 2240]
+
+# Create a bar chart using the class names and the list of sizes.
+ax.bar(class_names, size)
+
+plt.grid(b=True, which='major', color='darkblue', linestyle='-')
+
+# Show the minor grid lines with very faint and almost transparent grey lines
+plt.minorticks_on()
+# color=#888888 or indigo
+plt.grid(b=True, which='minor', color='black', linestyle='--', alpha=0.4)
+
+plt.savefig('clas.png',dpi=800,bbox_inches='tight')
+# Display the bar chart.
+plt.show()
+
+# Create a sequential model.
+model = keras.models.Sequential()
+
+# Add a Rescaling layer to the model with a scaling factor of 1./255 and the input shape of IMG_HEIGHT x IMG_WIDTH x 3.
+model.add(keras.layers.experimental.preprocessing.Rescaling(1./255, input_shape=(IMG_HEIGHT,IMG_WIDTH, 3)))
+
+# Add a 2D convolutional layer with 16 filters, a kernel size of (3, 3), padding of 'same', ReLU activation function, 
+# and He normal kernel initializer.
+model.add(keras.layers.Conv2D(filters=16,kernel_size=(3,3),padding='same',activation='relu',kernel_initializer="he_normal"))
+
+# Add a max pooling layer with a pool size of (2, 2).
+model.add(keras.layers.MaxPooling2D(pool_size=(2,2)))
+
+# Add a dropout layer with a rate of 0.20.
+model.add(keras.layers.Dropout(0.20))
+model.add(keras.layers.Conv2D(filters=32,kernel_size=(3,3),padding='same',activation='relu',kernel_initializer="he_normal"))
+model.add(keras.layers.MaxPooling2D(pool_size=(2,2)))
+model.add(keras.layers.Dropout(0.20))
+model.add(keras.layers.Conv2D(filters=64,kernel_size=(3,3),padding='same',activation='relu',kernel_initializer="he_normal"))
+model.add(keras.layers.MaxPooling2D(pool_size=(2,2)))
+model.add(keras.layers.Dropout(0.25))
+
+# Flatten the output from the convolutional layers.
+model.add(keras.layers.Flatten())
+
+# Add a fully connected layer with 128 neurons, ReLU activation function, and He normal kernel initializer.
+model.add(keras.layers.Dense(128,activation="relu",kernel_initializer="he_normal"))
+
+# Add another fully connected layer with 64 neurons and ReLU activation function.
+model.add(keras.layers.Dense(64,"relu"))
+
+# Add the output layer with 4 neurons and a softmax activation function.
+model.add(keras.layers.Dense(4,"softmax"))
+
+model.compile(loss="sparse_categorical_crossentropy",
+              optimizer = "Adam",metrics=["accuracy"])
+model.summary()
+
+# This code is training the model using the train_ds dataset, and validating it using the val_ds dataset for 50 epochs 
+# with batch_size of 64.
+
+hist = model.fit(train_ds,validation_data=val_ds,epochs=50, batch_size=64, verbose=1)
+
+get_ac = hist.history['accuracy']
+get_los = hist.history['loss']
+val_acc = hist.history['val_accuracy']
+val_loss = hist.history['val_loss']
+
+epochs = range(len(get_ac))
+
+# Create a figure with 2 subplots in one row
+fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+# Plot the training accuracy and loss on the first subplot
+axs[0].plot(epochs, get_ac, 'r', label='Accuracy of Training data')
+axs[0].set_title('Training data accuracy')
+axs[0].legend(loc=0)
+axs[0].set_xlabel("Epochs")
+axs[0].set_ylabel("Accuracy")
+
+# Show the minor grid lines with very faint and almost transparent grey lines
+axs[0].grid(b=True, which='major', color='darkblue', linestyle='-')
+axs[0].minorticks_on()
+axs[0].grid(b=True, which='minor', color='black', linestyle='--', alpha=0.4)
+
+# Plot the training and validation accuracy on the second subplot
+axs[1].plot(epochs, get_los, 'g', label='Loss of Training Data')
+axs[1].set_title('Training Data Loss')
+axs[1].legend(loc=0)
+axs[1].set_xlabel("Epochs")
+axs[1].set_ylabel("Loss")
+
+# Show the minor grid lines with very faint and almost transparent grey lines
+axs[1].grid(b=True, which='major', color='darkblue', linestyle='-')
+axs[1].minorticks_on()
+axs[1].grid(b=True, which='minor', color='black', linestyle='--', alpha=0.4)
+
+# Adjust the spacing between the subplots
+plt.subplots_adjust(wspace=0.3)
+
+plt.show()
+
+
+# 2nd row
+
+fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+# Loss of training data
+axs[0].plot(epochs, val_acc, 'r', label='Accuracy of Validation Data')
+axs[0].set_title('Validation data Accuracy')
+axs[0].legend(loc=0)
+axs[0].set_xlabel("Epochs")
+axs[0].set_ylabel("Accuracy")
+# Show the minor grid lines with very faint and almost transparent grey lines
+axs[0].grid(b=True, which='major', color='darkblue', linestyle='-')
+axs[0].minorticks_on()
+axs[0].grid(b=True, which='minor', color='black', linestyle='--', alpha=0.4)
+
+# Loss of Validation Data
+axs[1].plot(epochs, val_loss, 'g', label='Loss of Validation Data')
+axs[1].set_title('Validation data loss')
+axs[1].legend(loc=0)
+axs[1].set_xlabel("Epochs")
+axs[1].set_ylabel("Loss")
+# Show the minor grid lines with very faint and almost transparent grey lines
+axs[1].grid(b=True, which='major', color='darkblue', linestyle='-')
+axs[1].minorticks_on()
+axs[1].grid(b=True, which='minor', color='black', linestyle='--', alpha=0.4)
+
+plt.subplots_adjust(wspace=0.3)
+
+# For Saving Figure in the path
+plt.savefig("Graphs.png")
+
+# Display the figure
+plt.show()
+
+# Evaluating the model on the test dataset and storing the loss and accuracy
+loss, accuracy = model.evaluate(test_ds)
+
+print('Test Accuracy:', accuracy)
+print('Loss:',loss)
+
+plt.figure(figsize=(20, 20))  # Create a new figure with size 20 x 20.
+
+# Loop through the first batch of images and labels in the test dataset.
+for images, labels in test_ds.take(1):
+    
+    # Loop through each image in the batch.
+    for i in range(16):
+        # Create a subplot with 4 rows, 4 columns and the i+1-th position.
+        ax = plt.subplot(4, 4, i + 1)
+        
+        # Display the image as a uint8 numpy array.
+        plt.imshow(images[i].numpy().astype("uint8"))
+        
+        # Make predictions on the current image using the trained model.
+        predictions = model.predict(tf.expand_dims(images[i], 0))
+        
+        # Compute the softmax score for the predictions.
+        score = tf.nn.softmax(predictions[0])
+        
+        # Check if the predicted class matches the actual class label.
+        if(class_names[labels[i]]==class_names[np.argmax(score)]):
+            # If the prediction is correct, set the title to "Actual" and the label text color to green.
+            plt.title("Actual: "+class_names[labels[i]])
+            plt.ylabel("Predicted: "+class_names[np.argmax(score)],fontdict={'color':'green'})
+        else:
+            # If the prediction is incorrect, set the title to "Actual" and the label text color to red.
+            plt.title("Actual: "+class_names[labels[i]])
+            plt.ylabel("Predicted: "+class_names[np.argmax(score)],fontdict={'color':'red'})
+        
+        # Remove y-axis tick labels.
+        plt.gca().axes.yaxis.set_ticklabels([])
+        
+        # Remove x-axis tick labels.
+        plt.gca().axes.xaxis.set_ticklabels([])
+
+# Show the figure.
+plt.show()
+
+
+plt.savefig("Predictions.png")
